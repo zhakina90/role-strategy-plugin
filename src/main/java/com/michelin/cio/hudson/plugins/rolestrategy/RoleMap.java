@@ -102,7 +102,15 @@ public class RoleMap {
    * @return ACL for the current {@link RoleMap}
    */
   public SidACL getACL(RoleType roleType, AccessControlled controlledItem) {
-    return new AclImpl(roleType, controlledItem);
+    return getACL(roleType, controlledItem, false);
+  }
+  
+  /**
+   * Get the ACL for the current {@link RoleMap}.
+   * @return ACL for the current {@link RoleMap}
+   */
+  public SidACL getACL(RoleType roleType, AccessControlled controlledItem, boolean checkSystemSid) {
+    return new AclImpl(roleType, controlledItem, checkSystemSid);
   }
 
   /**
@@ -284,10 +292,20 @@ public class RoleMap {
 
     AccessControlled item;
     RoleType roleType;
-
+    /**
+     * Enables checking of SystemSid against policies. Such behavior is
+     * ridiculous, but it restores a legacy behavior. 
+     */
+    final boolean checkSystemSid;
+    
+    public AclImpl(RoleType roleType, AccessControlled item, boolean checkSystemSid) {
+       this.item = item;
+       this.roleType = roleType;
+       this.checkSystemSid = checkSystemSid;
+    }
+    
     public AclImpl(RoleType roleType, AccessControlled item) {
-        this.item = item;
-        this.roleType = roleType;
+        this (roleType, item, false);
     }
       
     /**
@@ -299,7 +317,15 @@ public class RoleMap {
      */
     @Override
     protected Boolean hasPermission(Sid p, Permission permission) {
-      if(RoleMap.this.hasPermission(toString(p), permission, roleType, item)) {
+        if (!checkSystemSid) { // Specific handling of the system user
+            
+            User currentUser = User.current();
+            if (currentUser!=null && currentUser.getId().equals(SidACL.SYSTEM.getName())) {
+              return true;
+            }
+        }
+        
+        if(RoleMap.this.hasPermission(toString(p), permission, roleType, item)) {
         return true;
       }
       return null;

@@ -62,6 +62,7 @@ import java.util.SortedMap;
 import javax.servlet.ServletException;
 import net.sf.json.JSONObject;
 import org.acegisecurity.acls.sid.PrincipalSid;
+import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 
@@ -77,11 +78,20 @@ public class RoleBasedAuthorizationStrategy extends AuthorizationStrategy {
   public final static String MACRO_ROLE = "roleMacros";
   public final static String MACRO_USER  = "userMacros";
   
+  private final boolean checkSystemSid;
 
-  
   /** {@link RoleMap}s associated to each {@link AccessControlled} class */
   private final Map <String, RoleMap> grantedRoles = new HashMap < String, RoleMap >();
 
+  @DataBoundConstructor
+  public RoleBasedAuthorizationStrategy(boolean checkSystemSid) {
+    this.checkSystemSid = checkSystemSid;
+  }
+  
+  public RoleBasedAuthorizationStrategy() {
+      this(false);
+  }
+  
   /**
    * Get the root ACL.
    * @return The global ACL
@@ -89,7 +99,7 @@ public class RoleBasedAuthorizationStrategy extends AuthorizationStrategy {
   @Override
   public SidACL getRootACL() {
     RoleMap root = getRoleMap(GLOBAL);
-    return root.getACL(RoleType.Global, null);
+    return root.getACL(RoleType.Global, null, checkSystemSid);
   }
 
   
@@ -102,13 +112,15 @@ public class RoleBasedAuthorizationStrategy extends AuthorizationStrategy {
    private ACL getACL(String roleMapName, String itemName, RoleType roleType, AccessControlled item)
    {
      SidACL acl;
-     RoleMap roleMap = grantedRoles.get(roleMapName);
+     RoleMap roleMap = grantedRoles.get(roleMapName);  
      if(roleMap == null) {
        acl = getRootACL();
      }
      else {
        // Create a sub-RoleMap matching the project name, and create an inheriting from root ACL
-       acl = roleMap.newMatchingRoleMap(itemName).getACL(roleType, item).newInheritingACL(getRootACL());
+       acl = roleMap.newMatchingRoleMap(itemName)
+               .getACL(roleType, item, checkSystemSid)
+               .newInheritingACL(getRootACL());
      }
      return acl;   
    }
